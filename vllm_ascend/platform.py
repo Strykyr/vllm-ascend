@@ -1281,6 +1281,11 @@ def _check_ascend_config(vllm_config: VllmConfig, ascend_config) -> None:
                 "ShortRequestFirst scheduling cannot be enabled with batch_job_sched_config. "
                 "Please disable one of them."
             )
+        if scheduler_extension_config.history_req_lens_config.enabled:
+            raise ValueError(
+                "ShortRequestFirst scheduling cannot be enabled with history_req_lens_config. "
+                "Please disable one of them."
+            )
         if kv_role == "kv_consumer":
             raise ValueError(
                 "ShortRequestFirst scheduling is supported only on prefill or PD-mixed nodes, "
@@ -1289,6 +1294,36 @@ def _check_ascend_config(vllm_config: VllmConfig, ascend_config) -> None:
         if vllm_config.scheduler_config.async_scheduling:
             vllm_config.scheduler_config.scheduler_cls = (
                 "vllm_ascend.core.short_request_first_scheduler.ShortRequestFirstAsyncScheduler"
+            )
+
+    # history_req_lens_config requires FCFS and excludes other waiting-queue
+    # policies (short-request-first / batch-job) and kv-consumer paths.
+    if scheduler_extension_config.history_req_lens_config.enabled:
+        kv_transfer_config = vllm_config.kv_transfer_config
+        kv_role = getattr(kv_transfer_config, "kv_role", None)
+        if vllm_config.scheduler_config.policy != "fcfs":
+            raise ValueError(
+                "HistoryReqLens scheduling requires scheduler_config.policy='fcfs', "
+                f"but got {vllm_config.scheduler_config.policy!r}."
+            )
+        if scheduler_extension_config.short_request_first_config.enabled:
+            raise ValueError(
+                "HistoryReqLens scheduling cannot be enabled with short_request_first_config. "
+                "Please disable one of them."
+            )
+        if scheduler_extension_config.batch_job_sched_config.enabled:
+            raise ValueError(
+                "HistoryReqLens scheduling cannot be enabled with batch_job_sched_config. "
+                "Please disable one of them."
+            )
+        if kv_role == "kv_consumer":
+            raise ValueError(
+                "HistoryReqLens scheduling is supported only on prefill or PD-mixed nodes, "
+                "not PD-disaggregated D nodes (kv_role='kv_consumer')."
+            )
+        if vllm_config.scheduler_config.async_scheduling:
+            vllm_config.scheduler_config.scheduler_cls = (
+                "vllm_ascend.core.history_req_lens_scheduler.HistoryReqLensAsyncScheduler"
             )
 
     dyntra_lb_config = scheduler_extension_config.dyntra_lb_config

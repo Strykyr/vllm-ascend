@@ -137,6 +137,15 @@ class BalanceScheduler(Scheduler):
                 threshold=short_request_first_config.threshold,
                 long_max_wait_ms=short_request_first_config.long_max_wait_ms,
             )
+        history_req_lens_config = init_ascend_config(vllm_config).scheduler_config.history_req_lens_config
+        if history_req_lens_config.enabled:
+            from vllm_ascend.core.history_req_lens_scheduler import install_history_req_lens_waiting_queue
+
+            install_history_req_lens_waiting_queue(
+                self,
+                max_db_size=history_req_lens_config.max_db_size,
+                window_size=history_req_lens_config.window_size,
+            )
         self._balance_enabled = _balance_scheduling_enabled(vllm_config)
         # Injected by BalanceDPEngineCoreProc._has_global_unfinished_reqs
         # before the first gather. Only used on the enabled path (balance

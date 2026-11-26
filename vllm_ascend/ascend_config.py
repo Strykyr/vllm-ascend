@@ -1723,6 +1723,31 @@ class ShortRequestFirstConfig:
 
 
 @config
+class HistoryReqLensConfig:
+    """Configuration object for ``additional_config["scheduler_config"]["history_req_lens_config"]``.
+
+    Waiting-queue policy driven by historical decode lengths (LJF): requests
+    with the same prompt as previously finished requests are dispatched
+    longest-predicted-first, which shortens the makespan of RL rollout batches
+    where output length variance is high.
+    """
+
+    enabled: bool = False
+    # LRU capacity of the historical decode-length store (per prompt hash).
+    max_db_size: int = 1024
+    # Rolling-average window of observed output lengths per prompt.
+    window_size: int = 6
+
+    @model_validator(mode="after")
+    def _validate_config(self):
+        if self.max_db_size <= 0:
+            raise ValueError(f"history_req_lens_config.max_db_size must be a positive int; got {self.max_db_size}")
+        if self.window_size <= 0:
+            raise ValueError(f"history_req_lens_config.window_size must be a positive int; got {self.window_size}")
+        return self
+
+
+@config
 class DyntraLBConfig:
     """Configuration object for ``scheduler_config.dyntra_lb_config``."""
 
@@ -1776,6 +1801,7 @@ class SchedulerConfig:
     enable_balance_scheduling: bool = False
     recompute_scheduler_enable: bool = False
     short_request_first_config: ShortRequestFirstConfig = dataclasses.field(default_factory=ShortRequestFirstConfig)
+    history_req_lens_config: HistoryReqLensConfig = dataclasses.field(default_factory=HistoryReqLensConfig)
     batch_job_sched_config: BatchJobSchedConfig = dataclasses.field(default_factory=BatchJobSchedConfig)
     dyntra_lb_config: DyntraLBConfig = dataclasses.field(default_factory=DyntraLBConfig)
 
@@ -1816,6 +1842,7 @@ class SchedulerConfig:
             "recompute_scheduler_enable": _resolve("recompute_scheduler_enable", False),
             # Let pydantic coerce the resolved dicts into typed sub-configs.
             "short_request_first_config": _resolve("short_request_first_config", {}),
+            "history_req_lens_config": _resolve("history_req_lens_config", {}),
             "batch_job_sched_config": _resolve("batch_job_sched_config", {}),
             "dyntra_lb_config": scheduler_config.get("dyntra_lb_config", {}),
         }

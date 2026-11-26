@@ -1,0 +1,13 @@
+pr: 22903
+entries:
+  - category: feature
+    text: >-
+      Added a HistoryReqLens waiting-queue scheduling policy
+      (`additional_config.scheduler_config.history_req_lens_config`): the
+      decode length of finished requests is recorded per prompt hash (LRU,
+      rolling mean), and waiting requests are dispatched longest-predicted-
+      first so long decoders start early. This shortens the makespan of RL
+      rollout batches where the same prompt is sampled repeatedly and output
+      length variance is high. Disabled by default; requires FCFS policy and
+      is mutually exclusive with short_request_first_config /
+      batch_job_sched_config.
